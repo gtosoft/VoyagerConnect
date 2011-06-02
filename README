@@ -1,0 +1,17 @@
+
+VoyagerConnect will be an Android service. 
+
+It will run fully autonomously without the need for user intervention. 
+
+Its purpose is to provide a link between the OBD vehicle and the user interface. 
+
+The User Interface will connect via one or both of the following TCP links: "Command" and "Event". 
+
+VoyagerConnect can be configured to be launched on certain events
+	- car docked
+	- User Interface started on local phone
+
+
+V.C. will also do its best to detect vehicle state - running, stopped, and talley up trip statistics. 
+
+
