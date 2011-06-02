@@ -27,5 +27,9 @@
             </intent-filter>
         </activity>
 
+	    <uses-library android:name="com.gtosoft.libvoyager" />
+
     </application>
+    
+    
 </manifest>
