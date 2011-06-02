@@ -34,7 +34,7 @@ public class VoyagerService extends Service {
 	
 	DashDB ddb;
 	HybridSession hs;
-	GeneralStats mgStats = new GeneralStats();
+	GeneralStats mgStats;
 	
 	Thread mtDataCollector = null;
 	String mBTPeerMAC;
@@ -63,7 +63,43 @@ public class VoyagerService extends Service {
 	}
 
 
-    /** 
+	/**
+	 * Create method. Executed when the service is created but not yet started. 
+	 */
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		
+        msHelper = new ServiceHelper(this);
+        msHelper.registerChosenDeviceCallback(chosenCallback);
+        msHelper.startDiscovering();
+
+	}
+	
+	/**
+	 * This method is executed once the service is "running". This is where magic happens. 
+	 */
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		
+		mgStats = new GeneralStats();
+
+		updateOBDNotification("onStartCommand()");
+		
+		// ask that the system re-deliver the start request with intent if we die.
+		return START_REDELIVER_INTENT;
+	}
+
+	/**
+	 * Shutdown sequence. Close out any open connections. 
+	 */
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+		shutdown();
+	}
+
+	/** 
      * libVoyager can do the BT discovery and device choosing for you. When it finds/chooses a device  it runs the device chosen callback.
      * This method defines what to do when a new device is found.  
      */
@@ -262,40 +298,6 @@ public class VoyagerService extends Service {
 	};// end of eventcallback def. 
 
     
-	/**
-	 * Create method. Executed when the service is created but not yet started. 
-	 */
-	@Override
-	public void onCreate() {
-		super.onCreate();
-		
-        msHelper = new ServiceHelper(this);
-        msHelper.registerChosenDeviceCallback(chosenCallback);
-        msHelper.startDiscovering();
-
-	}
-	
-	/**
-	 * This method is executed once the service is "running". This is where magic happens. 
-	 */
-	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-
-		updateOBDNotification("onStartCommand()");
-		
-		
-		// ask that the system re-deliver the start request with intent if we die.
-		return START_REDELIVER_INTENT;
-	}
-
-	/**
-	 * Shutdown sequence. Close out any open connections. 
-	 */
-	@Override
-	public void onDestroy() {
-		super.onDestroy();
-		shutdown();
-	}
 
 
 	/**
