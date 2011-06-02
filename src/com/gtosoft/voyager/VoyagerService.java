@@ -152,7 +152,8 @@ public class VoyagerService extends Service {
     				loops++;
     				mgStats.setStat("loops", "" + loops);
     				// moved this to the top of the loop so that we can run a "continue" and not cause a tight loop. 
-    				EasyTime.safeSleep(1000);
+    				EasyTime.safeSleep(10000);
+    				msg ("Loop Top.");
     				
     				// when hs goes from null to defined, that means a device was discovered. 
     				if (hs != null) {
@@ -170,8 +171,9 @@ public class VoyagerService extends Service {
     						} else {
     							// hardware detection was successful.
 //    							mStatusBox.setStatusLevel("Detected!", 5);
-
     						}
+    					} else {
+    						// Hardware is detected or we're disconnected. 
     					}
 
     					// Has the session type been detected and switched to moni by the detectSessionAndStartSniffing process...  
@@ -187,6 +189,11 @@ public class VoyagerService extends Service {
     				} else {
     					// hybrid session not defined or session still being detected. do nothing / Sleep longer?
     				}
+
+					if (hs != null && hs.getEBT().isConnected()) 
+						msg ("Hardware detection was completed. Capabilities: " + hs.getCapabilitiesString());
+
+
     				
     			}// end of main while loop. 
     			msg ("Data collector loop finished.");
@@ -236,7 +243,7 @@ public class VoyagerService extends Service {
 				msg ("After switch to moni.");
 			} else {
 				msg ("Hardware does not support sniff.");
-				return false;
+				return true;
 			}
 		} else {
 			// return value of the session deteciton was false so return false. 
@@ -395,6 +402,7 @@ public class VoyagerService extends Service {
 		return true;
 	}
 
+		
 	/**
 	 * call this method to shut down. 
 	 */
