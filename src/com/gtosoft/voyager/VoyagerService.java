@@ -2,7 +2,7 @@
 /**
  * This class will define the service aspect of VoyagerConnect.
  */
-package com.gtosoft.voyager.service;
+package com.gtosoft.voyager;
 
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -22,7 +22,6 @@ import com.gtosoft.libvoyager.session.MonitorSession;
 import com.gtosoft.libvoyager.util.EasyTime;
 import com.gtosoft.libvoyager.util.EventCallback;
 import com.gtosoft.libvoyager.util.GeneralStats;
-import com.gtosoft.voyager.ConnectUI;
 import com.gtosoft.voyager.R;
 
 /**
