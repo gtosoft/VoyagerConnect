@@ -19,6 +19,7 @@ import com.gtosoft.libvoyager.android.ServiceHelper;
 import com.gtosoft.libvoyager.db.DashDB;
 import com.gtosoft.libvoyager.session.HybridSession;
 import com.gtosoft.libvoyager.session.MonitorSession;
+import com.gtosoft.libvoyager.util.AutoSessionAdapter;
 import com.gtosoft.libvoyager.util.EasyTime;
 import com.gtosoft.libvoyager.util.EventCallback;
 import com.gtosoft.libvoyager.util.GeneralStats;
@@ -29,10 +30,12 @@ import com.gtosoft.voyager.R;
  */
 public class VoyagerService extends Service {
 	
+	AutoSessionAdapter mSessionAdapter;
+	
 	boolean mThreadsOn = true;
 	
 	DashDB ddb;
-	HybridSession hs;
+//	HybridSession hs;
 	GeneralStats mgStats;
 	
 	Thread mtDataCollector = null;
@@ -68,25 +71,54 @@ public class VoyagerService extends Service {
 	@Override
 	public void onCreate() {
 		super.onCreate();
-		
-        msHelper = new ServiceHelper(this);
-        msHelper.registerChosenDeviceCallback(chosenCallback);
-        msHelper.startDiscovering();
-
+		mgStats = new GeneralStats();
 	}
+	
+	/**
+	 * defines what action will be taken any time we receive an oob message. 
+	 */
+	EventCallback mOOBDataHandler = new EventCallback () {
+		@Override
+		public void onOOBDataArrived(String dataName, String dataValue) {
+			msg ("OOB Data Received: " + dataName + "=" + dataValue);
+			
+			// Put state messages into the notification. 
+			if (dataName.contains("state"))
+				updateOBDNotification(dataValue);
+		};
+	};
 	
 	/**
 	 * This method is executed once the service is "running". This is where magic happens. 
 	 */
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		
-		mgStats = new GeneralStats();
 
-		updateOBDNotification("onStartCommand()");
+		setCurrentStateMessage("Adapter init...");
+		mSessionAdapter = new AutoSessionAdapter(VoyagerService.this, BluetoothAdapter.getDefaultAdapter(), mOOBDataHandler);
+		setCurrentStateMessage("Adapter is up");
+		
+		// just prints stats. 
+		startDataCollectorLoop();
 		
 		// ask that the system re-deliver the start request with intent if we die.
 		return START_REDELIVER_INTENT;
+	}
+
+	private void setCurrentStateMessage (String m) {
+		mgStats.setStat("state", m);
+		sendOOBMessage("autosessionadapter.state", m);
+	}
+
+	/**
+	 * Sends a message through the OOB pipe. 
+	 * @param dataName
+	 * @param dataValue
+	 */
+	private void sendOOBMessage (String dataName, String dataValue) {
+		if (mOOBDataHandler == null)
+			return;
+		mOOBDataHandler.onOOBDataArrived(dataName, dataValue);
 	}
 
 	/**
@@ -98,45 +130,62 @@ public class VoyagerService extends Service {
 		shutdown();
 	}
 
-	/** 
-     * libVoyager can do the BT discovery and device choosing for you. When it finds/chooses a device  it runs the device chosen callback.
-     * This method defines what to do when a new device is found.  
-     */
-    private EventCallback chosenCallback = new EventCallback () {
+//	/** 
+//     * libVoyager can do the BT discovery and device choosing for you. When it finds/chooses a device  it runs the device chosen callback.
+//     * This method defines what to do when a new device is found.  
+//     */
+//    private EventCallback chosenCallback = new EventCallback () {
+//
+//    	@Override
+//    	public void onELMDeviceChosen(String MAC) {
+//    		mBTPeerMAC = MAC;
+//    	}
+//    	
+//    };// end of eventcallback definition. 
 
-    	@Override
-    	public void onELMDeviceChosen(String MAC) {
-    		mBTPeerMAC = MAC;
-    		setupSession(MAC);
-    	}
-    	
-    };// end of eventcallback definition. 
-
-    private boolean setupSession (String deviceMACAddress) {
-    	  // Make sure we aren't threading out into more than one device. we can't presently handle multiple OBD devices at once. 
-    	  if (hs != null) {
-    		  msg ("Multiple OBD devices detected. throwing out " + deviceMACAddress);
-    		  return false;
-    	  }
-    	  
-    	  // instantiate dashDB if necessary.
-    	  if (ddb == null) {
-    		  msg  ("Spinning up DB...");
-    		  ddb = new DashDB(this);
-    		  msg  ("DB Ready.");
-    	  }
-
-//    	  mStatusBox.setStatusLevel("Connecting to " + deviceMACAddress, 2);
-    	  hs = new HybridSession (BluetoothAdapter.getDefaultAdapter(), deviceMACAddress, ddb, ecbOOBMessageHandler);
-    	  // register a method to be called when new data arrives. 
-    	  hs.registerDPArrivedCallback(ecbDPNArrivedHandler);
-
-        startDataCollectorLoop();
-
-        mBTPeerMAC = deviceMACAddress;
-          
-    	  return true;
-    }
+//    /**
+//     * Blocking method, sets up the session and returns only after it is ready or we gave up trying for another reason. 
+//     * @param deviceMACAddress
+//     * @return - true if setup was 100% successful. False otherwise. 
+//     */
+//    private synchronized boolean setupSession (String deviceMACAddress) {
+//    	mBTPeerMAC = deviceMACAddress;
+//    	
+//    	mgStats.incrementStat ("sessionSetups");
+//    	
+//    	// Make sure we aren't threading out into more than one device. we can't presently handle multiple OBD devices at once. 
+//    	if (hs != null) {
+//    		msg ("Multiple OBD devices detected. throwing out " + deviceMACAddress);
+//    		return false;
+//    	}
+//
+//    	// instantiate dashDB if necessary.
+//    	if (ddb == null) {
+//    		msg  ("Spinning up DB...");
+//    		ddb = new DashDB(this);
+//    		msg  ("DB Ready.");
+//    	}
+//
+//    	// mStatusBox.setStatusLevel("Connecting to " + deviceMACAddress, 2);
+//    	hs = new HybridSession (BluetoothAdapter.getDefaultAdapter(), deviceMACAddress, ddb, ecbOOBMessageHandler);
+//    	// register a method to be called when new data arrives. 
+//    	hs.registerDPArrivedCallback(ecbDPNArrivedHandler);
+//
+//    	// detect hardware and network. Retry forever until we get it or are disconnected. 
+//    	while (mThreadsOn == true && hs.getEBT().isConnected() == true && hs.runSessionDetection() != true) {
+//    		mgStats.incrementStat("hsDetectTries");
+//    		msg ("Running session detection. EBT.connected=" + hs.getEBT().isConnected() + " hsdetection.valid=" + hs.isDetectionValid());
+//    	}
+//
+//    	// If the above while loop broke out because of a failure, then bust out of the session setup process. 
+//    	if (hs.runSessionDetection() != true || hs.getEBT().isConnected() != true) 
+//    		return false;
+//    	
+//    	// Hopefully it's ok if the loop was already running 'cause if setupSession gets called twice in the app's lifetime, it will get called twice. 
+//    	startDataCollectorLoop();
+//    	
+//    	return true;
+//    }
 
     private boolean startDataCollectorLoop () {
     	if (mtDataCollector != null) {
@@ -146,54 +195,16 @@ public class VoyagerService extends Service {
     	// Define the thread. 
     	mtDataCollector = new Thread() {
     		public void run () {
-    			int loops = 0;
     			boolean hardwareDetected = false;
     			while (mThreadsOn == true) {
-    				loops++;
-    				mgStats.setStat("loops", "" + loops);
+    				mgStats.incrementStat("dataCollectorLoops");
     				// moved this to the top of the loop so that we can run a "continue" and not cause a tight loop. 
     				EasyTime.safeSleep(10000);
     				msg ("Loop Top.");
     				
-    				// when hs goes from null to defined, that means a device was discovered. 
-    				if (hs != null) {
-
-    					// run session detection if necessary. 
-    					if (hardwareDetected == false && hs.getEBT().isConnected() == true) { 
-        					dumpStatsToScreen();
-//        					mStatusBox.setStatusLevel("Checking Hardware Type", 4);
-    						hardwareDetected = detectSessionAndStartSniffing();
-        					dumpStatsToScreen();
-    						if (hardwareDetected != true) {
-    							// hardware detection failed. It will be attempted again soon. 
-    							msg ("Failed attempt to detect hardware at loop " + loops);
-    							continue; 
-    						} else {
-    							// hardware detection was successful.
-//    							mStatusBox.setStatusLevel("Detected!", 5);
-    						}
-    					} else {
-    						// Hardware is detected or we're disconnected. 
-    					}
-
-    					// Has the session type been detected and switched to moni by the detectSessionAndStartSniffing process...  
-    					if (hs.getCurrentSessionType() == HybridSession.SESSION_TYPE_MONITOR) {
-        					MonitorSession m = hs.getMonitorSession();
-        					// Show GeneralStats leading up to a full connection state. After that, display DPNs.
-        					if (m != null && m.getCurrentState() >= MonitorSession.STATE_SNIFFING && hs.getPIDDecoder().getNetworkID().length()>0) {
-        						dumpAllDPNsToScreen();
-        					} else {
-            					dumpStatsToScreen();
-        					}
-    					}
-    				} else {
-    					// hybrid session not defined or session still being detected. do nothing / Sleep longer?
+    				if (mSessionAdapter != null) {
+    					dumpStatsToScreen();
     				}
-
-					if (hs != null && hs.getEBT().isConnected()) 
-						msg ("Hardware detection was completed. Capabilities: " + hs.getCapabilitiesString());
-
-
     				
     			}// end of main while loop. 
     			msg ("Data collector loop finished.");
@@ -210,7 +221,10 @@ public class VoyagerService extends Service {
      * write allDPNsAsString to the screen. 
      */
 	private void dumpAllDPNsToScreen() {
-		msg(hs.getPIDDecoder().getAllDataPointsAsString());
+		try {
+			msg(mSessionAdapter.getHybridSession().getPIDDecoder().getAllDataPointsAsString());
+		} catch (Exception e) {
+		}
 	}
 
 	private void dumpStatsToScreen  () {
@@ -219,39 +233,39 @@ public class VoyagerService extends Service {
 	}
 
 	public GeneralStats getStats () {
-		if (hs != null) mgStats.merge("svc", hs.getStats());
+		if (mSessionAdapter != null) mgStats.merge("svc", mSessionAdapter.getStats());
 		
 		return mgStats;
 	}
 
 	
-	/**
-	 * Do whatever necessary to detect hardware type and get it into sniff mode. 
-	 * We only try to detect the hardware once, if it fails, we return false. 
-	 * So if you get a false reading from this method, make another call. repeat as necessary.  
-	 */
-    private boolean detectSessionAndStartSniffing() {
-		msg ("Running session detection...");
-		boolean result = hs.runSessionDetection();
-		msg ("Session detection result was " + result);
-		if (result == true) {
-			// session detection was successful, move to next phase. 
-			msg ("Session detection succeeded, Switching to moni session... If possible. ");
-			if (hs.isHardwareSniffable()) {
-				msg ("Hardware IS sniffable, so switching to moni");
-				hs.setActiveSession(HybridSession.SESSION_TYPE_MONITOR);
-				msg ("After switch to moni.");
-			} else {
-				msg ("Hardware does not support sniff.");
-				return true;
-			}
-		} else {
-			// return value of the session deteciton was false so return false. 
-			return false;
-		}
-		
-		return true;
-    }
+//	/**
+//	 * Do whatever necessary to detect hardware type and get it into sniff mode. 
+//	 * We only try to detect the hardware once, if it fails, we return false. 
+//	 * So if you get a false reading from this method, make another call. repeat as necessary.  
+//	 */
+//    private boolean detectSessionAndStartSniffing() {
+//		msg ("Running session detection...");
+//		boolean result = hs.runSessionDetection();
+//		msg ("Session detection result was " + result);
+//		if (result == true) {
+//			// session detection was successful, move to next phase. 
+//			msg ("Session detection succeeded, Switching to moni session... If possible. ");
+//			if (hs.isHardwareSniffable()) {
+//				msg ("Hardware IS sniffable, so switching to moni");
+//				hs.setActiveSession(HybridSession.SESSION_TYPE_MONITOR);
+//				msg ("After switch to moni.");
+//			} else {
+//				msg ("Hardware does not support sniff.");
+//				return true;
+//			}
+//		} else {
+//			// return value of the session deteciton was false so return false. 
+//			return false;
+//		}
+//		
+//		return true;
+//    }
 
     
     // Defines the logic to take place when an out of band message is generated by the hybrid session layer. 
@@ -278,19 +292,6 @@ public class VoyagerService extends Service {
 				
 			}// end of "if this was a io state change". 
 			
-			// session state change? 
-			if (dataName.equals(HybridSession.OOBMessageTypes.SESSION_STATE_CHANGE) && hs.getCurrentSessionType() == HybridSession.SESSION_TYPE_MONITOR) {
-				int newState = 0;
-				
-				// convert from string to integer. 
-				try {
-					newState = Integer.valueOf(dataValue);
-				} catch (NumberFormatException e) {
-					return;
-				}
-				
-
-			}// end of if. 
 				
 			}// end of session state change handler. 
 		};// end of override.
@@ -409,7 +410,8 @@ public class VoyagerService extends Service {
 	private void shutdown () {
 		mThreadsOn = false;
 		// shut down the hybridsession chain.
-		if (hs != null) hs.shutdown();
+//		if (hs != null) hs.shutdown();
+		if (mSessionAdapter != null) mSessionAdapter.shutdown();
 		// interrupt the data collection thread. 
 		if (mtDataCollector != null) mtDataCollector.interrupt();
 		stopSelf();
