@@ -16,14 +16,12 @@ import android.os.IBinder;
 import android.util.Log;
 
 import com.gtosoft.libvoyager.android.ServiceHelper;
+import com.gtosoft.libvoyager.autosession.AutoSessionAdapter;
 import com.gtosoft.libvoyager.db.DashDB;
 import com.gtosoft.libvoyager.session.HybridSession;
-import com.gtosoft.libvoyager.session.MonitorSession;
-import com.gtosoft.libvoyager.util.AutoSessionAdapter;
 import com.gtosoft.libvoyager.util.EasyTime;
 import com.gtosoft.libvoyager.util.EventCallback;
 import com.gtosoft.libvoyager.util.GeneralStats;
-import com.gtosoft.voyager.R;
 
 /**
  * @author Brad Hein / GTOSoft LLC. 
@@ -203,6 +201,8 @@ public class VoyagerService extends Service {
     				msg ("Loop Top.");
     				
     				if (mSessionAdapter != null) {
+    					// svc.hs.rScan.loops=1465
+    					updateOBDNotification("svc.hs.rScan.loops=" + getStats().getStat("svc.hs.rScan.loops"));
     					dumpStatsToScreen();
     				}
     				
