@@ -28,6 +28,9 @@ import com.gtosoft.libvoyager.util.GeneralStats;
  */
 public class VoyagerService extends Service {
 	
+	// if true, lots of debug messages may be produced for development and testing purposes. 
+	private boolean DEBUG = false;
+
 	AutoSessionAdapter mSessionAdapter;
 	
 	boolean mThreadsOn = true;
@@ -51,8 +54,6 @@ public class VoyagerService extends Service {
 	Notification mNotificationGeneral = null;
 	Notification mNotificationCheckEngine = null;
 
-	// if true, lots of debug messages may be produced for development and testing purposes. 
-	private boolean DEBUG = true;
 
 
 	/**
@@ -69,7 +70,7 @@ public class VoyagerService extends Service {
 	@Override
 	public void onCreate() {
 		super.onCreate();
-		mgStats = new GeneralStats();
+		if (mgStats == null) mgStats = new GeneralStats();
 	}
 	
 	/**
@@ -78,11 +79,11 @@ public class VoyagerService extends Service {
 	EventCallback mOOBDataHandler = new EventCallback () {
 		@Override
 		public void onOOBDataArrived(String dataName, String dataValue) {
-			msg ("OOB Data Received: " + dataName + "=" + dataValue);
+//			msg ("OOB Data Received: " + dataName + "=" + dataValue);
 			
 			// Put state messages into the notification. 
 			if (dataName.contains("state"))
-				updateOBDNotification(dataValue);
+				updateOBDNotification(dataName + "=" + dataValue);
 		};
 	};
 	
@@ -92,22 +93,36 @@ public class VoyagerService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 
-		setCurrentStateMessage("Adapter init...");
-		mSessionAdapter = new AutoSessionAdapter(VoyagerService.this, BluetoothAdapter.getDefaultAdapter(), mOOBDataHandler);
-		setCurrentStateMessage("Adapter is up");
+		boolean ret = doStartupSequence();
 		
-		// just prints stats. 
-		startDataCollectorLoop();
+		if (ret == false) {
+			msg ("Ignored EXTRA REQUEST for service to start!");
+		}
 		
 		// ask that the system re-deliver the start request with intent if we die.
 		return START_REDELIVER_INTENT;
 	}
 
-	private void setCurrentStateMessage (String m) {
-		mgStats.setStat("state", m);
-		sendOOBMessage("autosessionadapter.state", m);
-	}
+//	private void setCurrentStateMessage (String m) {
+//		mgStats.setStat("state", m);
+//		sendOOBMessage("autosessionadapter.state", m);
+//	}
 
+	private synchronized boolean doStartupSequence () {
+		if (mSessionAdapter != null)
+			return false;
+		
+//		setCurrentStateMessage("Adapter init...");
+		mSessionAdapter = new AutoSessionAdapter(VoyagerService.this, BluetoothAdapter.getDefaultAdapter(), mOOBDataHandler);
+//		setCurrentStateMessage("Adapter is up");
+		
+		// just prints stats. 
+		startDataCollectorLoop();
+
+		return true;
+	}
+	
+	
 	/**
 	 * Sends a message through the OOB pipe. 
 	 * @param dataName
@@ -203,7 +218,7 @@ public class VoyagerService extends Service {
     				if (mSessionAdapter != null) {
     					// svc.hs.rScan.loops=1465
     					updateOBDNotification("svc.hs.rScan.loops=" + getStats().getStat("svc.hs.rScan.loops"));
-    					dumpStatsToScreen();
+    					if (DEBUG) dumpStatsToScreen();
     				}
     				
     			}// end of main while loop. 
