@@ -4,10 +4,18 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     >
-<TextView  
-	android:id="@+id/tvMain"
-    android:layout_width="fill_parent" 
-    android:layout_height="wrap_content" 
-    android:text="@string/hello"
-    />
+
+<Button android:id="@+id/btnStopService" 
+	android:text="Stop Service" 
+	android:layout_width="fill_parent" 
+	android:layout_height="wrap_content"/>
+
+	
+<ScrollView android:layout_width="fill_parent" android:layout_height="wrap_content">
+	<TextView  
+		android:id="@+id/tvMain"
+	    android:layout_width="fill_parent" 
+	    android:layout_height="wrap_content" 
+	    />
+</ScrollView>
 </LinearLayout>

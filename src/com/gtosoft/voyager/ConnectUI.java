@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.gtosoft.libvoyager.android.ELMBT;
@@ -17,6 +20,7 @@ public class ConnectUI extends Activity {
 	ELMBT ebt;
 	SVIPTCPClient svipClient;
 	TextView mtvMain;
+	Button mbtnStopService;
 	Handler muiHandler = new Handler();
 	
 	
@@ -26,6 +30,8 @@ public class ConnectUI extends Activity {
         setContentView(R.layout.main);
 
         mtvMain = (TextView) findViewById(R.id.tvMain);
+        mbtnStopService = (Button) findViewById(R.id.btnStopService);
+        setButtonEventHandlers();       
         
         
         Log.d("ConnectUI.svcEnable.setOnclickListener()","Create Intent...");
@@ -38,6 +44,19 @@ public class ConnectUI extends Activity {
         registerSVIPCallbacks();
     }
 
+    private boolean setButtonEventHandlers () {
+    	
+    	mbtnStopService.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				msg ("Stopping service.");
+				Intent svc = new Intent ("com.gtosoft.voyager.service.start");
+				stopService(svc);
+			}
+		});
+    	
+    	return true;
+    }
     
 
     EventCallback mECBDPArrived = new EventCallback () {

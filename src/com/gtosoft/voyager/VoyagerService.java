@@ -18,10 +18,10 @@ import android.util.Log;
 import com.gtosoft.libvoyager.android.ServiceHelper;
 import com.gtosoft.libvoyager.autosession.AutoSessionAdapter;
 import com.gtosoft.libvoyager.db.DashDB;
-import com.gtosoft.libvoyager.session.HybridSession;
 import com.gtosoft.libvoyager.util.EasyTime;
 import com.gtosoft.libvoyager.util.EventCallback;
 import com.gtosoft.libvoyager.util.GeneralStats;
+import com.gtosoft.libvoyager.util.OOBMessageTypes;
 
 /**
  * @author Brad Hein / GTOSoft LLC. 
@@ -72,20 +72,7 @@ public class VoyagerService extends Service {
 		super.onCreate();
 		if (mgStats == null) mgStats = new GeneralStats();
 	}
-	
-	/**
-	 * defines what action will be taken any time we receive an oob message. 
-	 */
-	EventCallback mOOBDataHandler = new EventCallback () {
-		@Override
-		public void onOOBDataArrived(String dataName, String dataValue) {
-//			msg ("OOB Data Received: " + dataName + "=" + dataValue);
-			
-			// Put state messages into the notification. 
-			if (dataName.contains("state"))
-				updateOBDNotification(dataName + "=" + dataValue);
-		};
-	};
+
 	
 	/**
 	 * This method is executed once the service is "running". This is where magic happens. 
@@ -97,23 +84,20 @@ public class VoyagerService extends Service {
 		
 		if (ret == false) {
 			msg ("Ignored EXTRA REQUEST for service to start!");
+			stopSelf();
 		}
 		
 		// ask that the system re-deliver the start request with intent if we die.
 		return START_REDELIVER_INTENT;
 	}
 
-//	private void setCurrentStateMessage (String m) {
-//		mgStats.setStat("state", m);
-//		sendOOBMessage("autosessionadapter.state", m);
-//	}
-
 	private synchronized boolean doStartupSequence () {
 		if (mSessionAdapter != null)
 			return false;
 		
 //		setCurrentStateMessage("Adapter init...");
-		mSessionAdapter = new AutoSessionAdapter(VoyagerService.this, BluetoothAdapter.getDefaultAdapter(), mOOBDataHandler);
+		
+		mSessionAdapter = new AutoSessionAdapter(VoyagerService.this, BluetoothAdapter.getDefaultAdapter(), mLocalOOBMessageHandler, mLocalDPNArrivedHandler);
 //		setCurrentStateMessage("Adapter is up");
 		
 		// just prints stats. 
@@ -129,9 +113,9 @@ public class VoyagerService extends Service {
 	 * @param dataValue
 	 */
 	private void sendOOBMessage (String dataName, String dataValue) {
-		if (mOOBDataHandler == null)
+		if (mLocalOOBMessageHandler == null)
 			return;
-		mOOBDataHandler.onOOBDataArrived(dataName, dataValue);
+		mLocalOOBMessageHandler.onOOBDataArrived(dataName, dataValue);
 	}
 
 	/**
@@ -139,67 +123,16 @@ public class VoyagerService extends Service {
 	 */
 	@Override
 	public void onDestroy() {
+		sendOOBMessage(OOBMessageTypes.SERVICE_STATE_CHANGE,"shutdown");
 		super.onDestroy();
 		shutdown();
 	}
 
-//	/** 
-//     * libVoyager can do the BT discovery and device choosing for you. When it finds/chooses a device  it runs the device chosen callback.
-//     * This method defines what to do when a new device is found.  
-//     */
-//    private EventCallback chosenCallback = new EventCallback () {
-//
-//    	@Override
-//    	public void onELMDeviceChosen(String MAC) {
-//    		mBTPeerMAC = MAC;
-//    	}
-//    	
-//    };// end of eventcallback definition. 
 
-//    /**
-//     * Blocking method, sets up the session and returns only after it is ready or we gave up trying for another reason. 
-//     * @param deviceMACAddress
-//     * @return - true if setup was 100% successful. False otherwise. 
-//     */
-//    private synchronized boolean setupSession (String deviceMACAddress) {
-//    	mBTPeerMAC = deviceMACAddress;
-//    	
-//    	mgStats.incrementStat ("sessionSetups");
-//    	
-//    	// Make sure we aren't threading out into more than one device. we can't presently handle multiple OBD devices at once. 
-//    	if (hs != null) {
-//    		msg ("Multiple OBD devices detected. throwing out " + deviceMACAddress);
-//    		return false;
-//    	}
-//
-//    	// instantiate dashDB if necessary.
-//    	if (ddb == null) {
-//    		msg  ("Spinning up DB...");
-//    		ddb = new DashDB(this);
-//    		msg  ("DB Ready.");
-//    	}
-//
-//    	// mStatusBox.setStatusLevel("Connecting to " + deviceMACAddress, 2);
-//    	hs = new HybridSession (BluetoothAdapter.getDefaultAdapter(), deviceMACAddress, ddb, ecbOOBMessageHandler);
-//    	// register a method to be called when new data arrives. 
-//    	hs.registerDPArrivedCallback(ecbDPNArrivedHandler);
-//
-//    	// detect hardware and network. Retry forever until we get it or are disconnected. 
-//    	while (mThreadsOn == true && hs.getEBT().isConnected() == true && hs.runSessionDetection() != true) {
-//    		mgStats.incrementStat("hsDetectTries");
-//    		msg ("Running session detection. EBT.connected=" + hs.getEBT().isConnected() + " hsdetection.valid=" + hs.isDetectionValid());
-//    	}
-//
-//    	// If the above while loop broke out because of a failure, then bust out of the session setup process. 
-//    	if (hs.runSessionDetection() != true || hs.getEBT().isConnected() != true) 
-//    		return false;
-//    	
-//    	// Hopefully it's ok if the loop was already running 'cause if setupSession gets called twice in the app's lifetime, it will get called twice. 
-//    	startDataCollectorLoop();
-//    	
-//    	return true;
-//    }
-
+	/**
+	 * Just prints stats for now? Maybe not even necessary in release version. 
+	 * @return
+	 */
     private boolean startDataCollectorLoop () {
     	if (mtDataCollector != null) {
     		return false;
@@ -213,11 +146,10 @@ public class VoyagerService extends Service {
     				mgStats.incrementStat("dataCollectorLoops");
     				// moved this to the top of the loop so that we can run a "continue" and not cause a tight loop. 
     				EasyTime.safeSleep(10000);
-    				msg ("Loop Top.");
     				
     				if (mSessionAdapter != null) {
     					// svc.hs.rScan.loops=1465
-    					updateOBDNotification("svc.hs.rScan.loops=" + getStats().getStat("svc.hs.rScan.loops"));
+    					// updateOBDNotification("svc.hs.rScan.loops=" + getStats().getStat("svc.hs.rScan.loops"));
     					if (DEBUG) dumpStatsToScreen();
     				}
     				
@@ -254,37 +186,10 @@ public class VoyagerService extends Service {
 	}
 
 	
-//	/**
-//	 * Do whatever necessary to detect hardware type and get it into sniff mode. 
-//	 * We only try to detect the hardware once, if it fails, we return false. 
-//	 * So if you get a false reading from this method, make another call. repeat as necessary.  
-//	 */
-//    private boolean detectSessionAndStartSniffing() {
-//		msg ("Running session detection...");
-//		boolean result = hs.runSessionDetection();
-//		msg ("Session detection result was " + result);
-//		if (result == true) {
-//			// session detection was successful, move to next phase. 
-//			msg ("Session detection succeeded, Switching to moni session... If possible. ");
-//			if (hs.isHardwareSniffable()) {
-//				msg ("Hardware IS sniffable, so switching to moni");
-//				hs.setActiveSession(HybridSession.SESSION_TYPE_MONITOR);
-//				msg ("After switch to moni.");
-//			} else {
-//				msg ("Hardware does not support sniff.");
-//				return true;
-//			}
-//		} else {
-//			// return value of the session deteciton was false so return false. 
-//			return false;
-//		}
-//		
-//		return true;
-//    }
-
     
-    // Defines the logic to take place when an out of band message is generated by the hybrid session layer. 
-	EventCallback ecbOOBMessageHandler = new EventCallback () {
+    // Defines the logic to take place when an out of band message is generated by the hybrid session layer.
+	EventCallback mLocalOOBMessageHandler = new EventCallback () {
+
 		@Override
 		public void onOOBDataArrived(String dataName, String dataValue) {
 			
@@ -296,7 +201,7 @@ public class VoyagerService extends Service {
 			msg ("OOB Data: " + dataName + "=" + dataValue);
 			
 			// state change?
-			if (dataName.equals(HybridSession.OOBMessageTypes.IO_STATE_CHANGE)) {
+			if (dataName.equals(OOBMessageTypes.IO_STATE_CHANGE)) {
 				int newState = 0;
 				try {
 					newState = Integer.valueOf(dataValue);
@@ -306,13 +211,12 @@ public class VoyagerService extends Service {
 				}
 				
 			}// end of "if this was a io state change". 
-			
-				
-			}// end of session state change handler. 
-		};// end of override.
+		}// end of session state change handler. 
+	};// end of override.
 
-    
-	EventCallback ecbDPNArrivedHandler = new EventCallback () {
+
+	// TODO: Register this somewhere? 
+	EventCallback mLocalDPNArrivedHandler = new EventCallback () {
 		@Override
 		public void onDPArrived(String DPN, String sDecodedData, int iDecodedData) {
 			msg ("DPN Arrived: " + DPN + "=" + sDecodedData);
