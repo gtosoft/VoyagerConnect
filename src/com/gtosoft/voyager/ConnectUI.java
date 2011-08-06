@@ -79,8 +79,6 @@ public class ConnectUI extends Activity {
 		svipClient.registerOOBArrivedHandler(mECBOOBArrived);
 	}
 
-
-
 	/**
      * 
      * @param m

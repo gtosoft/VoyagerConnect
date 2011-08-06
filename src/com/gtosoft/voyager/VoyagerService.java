@@ -15,7 +15,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
-import com.gtosoft.libvoyager.android.ServiceHelper;
 import com.gtosoft.libvoyager.autosession.AutoSessionAdapter;
 import com.gtosoft.libvoyager.db.DashDB;
 import com.gtosoft.libvoyager.util.EasyTime;
@@ -41,7 +40,7 @@ public class VoyagerService extends Service {
 	
 	Thread mtDataCollector = null;
 	String mBTPeerMAC;
-	ServiceHelper msHelper;
+//	ServiceHelper msHelper;
 	
 	// for posting stuff back to the main service thread. 
 	Handler mHandler = new Handler();
