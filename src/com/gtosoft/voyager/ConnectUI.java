@@ -13,15 +13,18 @@ import android.widget.TextView;
 
 import com.gtosoft.libvoyager.android.ELMBT;
 import com.gtosoft.libvoyager.svip.SVIPTCPClient;
+import com.gtosoft.libvoyager.util.EasyTime;
 import com.gtosoft.libvoyager.util.EventCallback;
 
 public class ConnectUI extends Activity {
-	
-	ELMBT ebt;
+	boolean 	DEBUG 			= true;
+	ELMBT		ebt;
 	SVIPTCPClient svipClient;
-	TextView mtvMain;
-	Button mbtnStopService;
-	Handler muiHandler = new Handler();
+	TextView 	mtvMain;
+	Button 		mbtnStopService;
+	Handler 	muiHandler 		= new Handler();
+	Thread 		stupidThread 	= null;
+	boolean 	mThreadsOn 		= true;
 	
 	
     @Override
@@ -42,6 +45,8 @@ public class ConnectUI extends Activity {
         
         svipClient = new SVIPTCPClient();
         registerSVIPCallbacks();
+        
+        startStupidThread();
     }
 
     private boolean setButtonEventHandlers () {
@@ -79,6 +84,30 @@ public class ConnectUI extends Activity {
 		svipClient.registerOOBArrivedHandler(mECBOOBArrived);
 	}
 
+    private boolean startStupidThread () {
+    	if (stupidThread != null) return false;
+    	
+    	stupidThread = new Thread() {
+    		public void run () {
+    		
+    			while (mThreadsOn == true) {
+    				if (svipClient != null && svipClient.connected() == true) {
+    					if (DEBUG) msg ("Server PING response time: " + svipClient.pingServer());
+    				}
+    				
+    				EasyTime.safeSleep(1000);
+    			}
+    			
+    			if (DEBUG) msg ("End of connectUI thread run.");
+    		}// end of run()
+    	};
+    	stupidThread.start();
+    	
+    	
+    	return true;
+    }
+    
+    
 	/**
      * 
      * @param m
@@ -103,5 +132,7 @@ public class ConnectUI extends Activity {
     protected void onDestroy() {
     	super.onDestroy();
     	if (svipClient != null) svipClient.shutdown();
+    	mThreadsOn = false;
+    	if (stupidThread != null) stupidThread.interrupt();
     }
 }

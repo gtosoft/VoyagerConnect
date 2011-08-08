@@ -83,7 +83,6 @@ public class VoyagerService extends Service {
 		
 		if (ret == false) {
 			msg ("Ignored EXTRA REQUEST for service to start!");
-			stopSelf();
 		}
 		
 		// ask that the system re-deliver the start request with intent if we die.
@@ -123,6 +122,7 @@ public class VoyagerService extends Service {
 	@Override
 	public void onDestroy() {
 		sendOOBMessage(OOBMessageTypes.SERVICE_STATE_CHANGE,"shutdown");
+		EasyTime.safeSleep(500);
 		super.onDestroy();
 		shutdown();
 	}
@@ -140,7 +140,6 @@ public class VoyagerService extends Service {
     	// Define the thread. 
     	mtDataCollector = new Thread() {
     		public void run () {
-    			boolean hardwareDetected = false;
     			while (mThreadsOn == true) {
     				mgStats.incrementStat("dataCollectorLoops");
     				// moved this to the top of the loop so that we can run a "continue" and not cause a tight loop. 
@@ -218,7 +217,7 @@ public class VoyagerService extends Service {
 	EventCallback mLocalDPNArrivedHandler = new EventCallback () {
 		@Override
 		public void onDPArrived(String DPN, String sDecodedData, int iDecodedData) {
-			msg ("DPN Arrived: " + DPN + "=" + sDecodedData);
+//			msg ("DPN Arrived: " + DPN + "=" + sDecodedData);
 		}// end of onDPArrived. 
 	};// end of eventcallback def. 
 
