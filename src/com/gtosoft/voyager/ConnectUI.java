@@ -15,6 +15,7 @@ import com.gtosoft.libvoyager.android.ELMBT;
 import com.gtosoft.libvoyager.svip.SVIPTCPClient;
 import com.gtosoft.libvoyager.util.EasyTime;
 import com.gtosoft.libvoyager.util.EventCallback;
+import com.gtosoft.libvoyager.util.OOBMessageTypes;
 
 public class ConnectUI extends Activity {
 	boolean 	DEBUG 			= true;
@@ -44,7 +45,9 @@ public class ConnectUI extends Activity {
         startService(svc);
         
         svipClient = new SVIPTCPClient();
+        // Registers to handle OOB, DPN arrived, etc. 
         registerSVIPCallbacks();
+        // DPN subscriptions will automatically be made upon SVIP connect. 
         
         startStupidThread();
     }
@@ -64,15 +67,24 @@ public class ConnectUI extends Activity {
     }
     
 
-    EventCallback mECBDPArrived = new EventCallback () {
+    EventCallback mLocalECBDPArrived = new EventCallback () {
     	public void onDPArrived(String DPN, String sDecodedData, int iDecodedData) {
     		msg ("(ui)DP Arrived: " + DPN + "=" + sDecodedData);
     	}
     };
     
-    EventCallback mECBOOBArrived = new EventCallback () {
+    EventCallback mLocalECBOOBArrived = new EventCallback () {
     	public void onOOBDataArrived(String dataName, String dataValue) {
     		msg ("(ui)OOB Arrived: " + dataName + "=" + dataValue);
+    		
+    		if (dataName.equals(OOBMessageTypes.SVIP_CLIENT_JUST_CONNECTED)) {
+    			// SVIP connected... Pass our data subscriptions to the server.
+    			if (DEBUG) msg ("ConnectUI OOB event handler: SVIP Connected, registering subscriptions.");
+    	        svipClient.subscribe ("VOLTS");
+    	        svipClient.subscribe ("SPEED");
+    	        svipClient.subscribe ("RPM");
+    		}
+    		
     	}    	
     };
 
@@ -80,8 +92,8 @@ public class ConnectUI extends Activity {
 		if (svipClient == null)
 			return;
 		
-		svipClient.registerDPArrivedHandler(mECBDPArrived);
-		svipClient.registerOOBArrivedHandler(mECBOOBArrived);
+		svipClient.registerDPArrivedHandler(mLocalECBDPArrived);
+		svipClient.registerOOBArrivedHandler(mLocalECBOOBArrived);
 	}
 
     private boolean startStupidThread () {
