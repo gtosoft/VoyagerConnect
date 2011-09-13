@@ -1,10 +1,14 @@
 package com.gtosoft.voyager;
 
 
+import java.util.ArrayList;
+import java.util.List;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.style.SubscriptSpan;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -27,6 +31,8 @@ public class ConnectUI extends Activity {
 	Thread 		stupidThread 	= null;
 	boolean 	mThreadsOn 		= true;
 	
+	List<String> DPSubscriptions = new ArrayList<String>();
+	
 	
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -43,6 +49,8 @@ public class ConnectUI extends Activity {
         
         Log.d("ConnectUI.svcEnable.setOnclickListener()","Run intent to start service...");
         startService(svc);
+
+        setDefaultDPSubscriptions();
         
         svipClient = new SVIPTCPClient();
         // Registers to handle OOB, DPN arrived, etc. 
@@ -52,7 +60,17 @@ public class ConnectUI extends Activity {
         startStupidThread();
     }
 
-    private boolean setButtonEventHandlers () {
+    /**
+     * Used to populate the list before use. 
+     */
+    private void setDefaultDPSubscriptions() {
+        DPSubscriptions.clear();
+        DPSubscriptions.add("VOLTS");
+        DPSubscriptions.add("SPEED");
+        DPSubscriptions.add("RPM");
+	}
+
+	private boolean setButtonEventHandlers () {
     	
     	mbtnStopService.setOnClickListener(new OnClickListener() {
 			@Override
@@ -80,12 +98,14 @@ public class ConnectUI extends Activity {
     		if (dataName.equals(OOBMessageTypes.SVIP_CLIENT_JUST_CONNECTED)) {
     			// SVIP connected... Pass our data subscriptions to the server.
     			if (DEBUG) msg ("ConnectUI OOB event handler: SVIP Connected, registering subscriptions.");
-    	        svipClient.subscribe ("VOLTS");
-    	        svipClient.subscribe ("SPEED");
-    	        svipClient.subscribe ("RPM");
+    			svipClient.subscribe(DPSubscriptions);
     		}
     		
-    	}    	
+//    		if (dataName.equals(OOBMessageTypes.AUTODETECT_SUMMARY)) {
+//    			if ()
+//    		}// end of "autodetect just happened".
+    		
+    	}// end of public void onoobdataarrived. 
     };
 
     private void registerSVIPCallbacks() {
@@ -105,6 +125,10 @@ public class ConnectUI extends Activity {
     			while (mThreadsOn == true) {
     				if (svipClient != null && svipClient.connected() == true) {
     					if (DEBUG) msg ("Server PING response time: " + svipClient.pingServer());
+
+    					
+    	    			if (DEBUG) svipClient.subscribe(DPSubscriptions);
+
     				}
     				
     				EasyTime.safeSleep(1000);
